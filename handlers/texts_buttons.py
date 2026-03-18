@@ -33,8 +33,8 @@ def register_texts_buttons_handlers(app: Client):
             await callback.answer()
             return
         text = "📂 الأزرار الحالية:\n\n"
-        for b in buttons:
-            text += f"• {b['label']} ← {b['url']}\n"
+        for index, b in enumerate(buttons, start=1):
+            text += f"{index}️⃣ {b['label']}\n{b['url']}\n\n"
         await callback.message.edit_text(text, reply_markup=admin_buttons_keyboard())
         await callback.answer()
 
@@ -44,9 +44,14 @@ def register_texts_buttons_handlers(app: Client):
             await callback.answer("⛔ ممنوع", show_alert=True)
             return
         _waiting_button_input.add(callback.from_user.id)
-        _button_input_data[callback.from_user.id] = {"step": "label"}
+        _button_input_data[callback.from_user.id] = {"step": "combined"}
         await callback.message.edit_text(
-            "✏️ أرسل اسم الزر\n\nمثال:\nقناة البوت 📢"
+            "✏️ أرسل اسم الزر والرابط بهذا الشكل:\n"
+            "اسم الزر\n"
+            "الرابط\n\n"
+            "مثال:\n"
+            "قناة البوت\n"
+            "https://t.me/mychannel"
         )
         await callback.answer()
 
@@ -92,16 +97,25 @@ def register_texts_buttons_handlers(app: Client):
             data = _button_input_data.get(user_id, {})
             step = data.get("step")
 
-            if step == "label":
-                _button_input_data[user_id]["label"] = message.text.strip()
-                _button_input_data[user_id]["step"] = "url"
-                await message.reply(
-                    "🔗 الآن أرسل رابط الزر\n\nمثال:\nhttps://t.me/yourchannel",
-                    quote=True
-                )
-            elif step == "url":
-                label = _button_input_data[user_id].get("label", "")
-                url = message.text.strip()
+            if step == "combined":
+                parts = [part.strip() for part in message.text.splitlines() if part.strip()]
+                if len(parts) < 2:
+                    await message.reply(
+                        "⚠️ الصيغة غير صحيحة.\n\n"
+                        "أرسل اسم الزر في السطر الأول والرابط في السطر الثاني.",
+                        quote=True
+                    )
+                    return
+
+                label = parts[0]
+                url = parts[1]
+                if not (url.startswith("http://") or url.startswith("https://") or url.startswith("tg://")):
+                    await message.reply(
+                        "⚠️ الرابط غير صالح. أرسل رابطًا يبدأ بـ https:// أو http:// أو tg://",
+                        quote=True
+                    )
+                    return
+
                 _waiting_button_input.discard(user_id)
                 _button_input_data.pop(user_id, None)
                 add_button(label, url)

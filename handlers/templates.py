@@ -23,10 +23,13 @@ def register_template_handlers(app: Client):
             await callback.answer("⛔ ممنوع", show_alert=True)
             return
         _waiting_template_upload.add(callback.from_user.id)
-        await callback.message.edit_text("📤 أرسل الصورة التي تريد إضافتها كقالب")
+        await callback.message.edit_text(
+            "📤 أرسل الصورة التي تريد إضافتها كقالب.\n"
+            "يمكنك إرسال PNG أو JPG أو JPEG، وسيتم حفظها داخل مجلد القوالب واستخدامها تلقائيًا عند التصميم."
+        )
         await callback.answer()
 
-    @app.on_message(filters.private & filters.photo)
+    @app.on_message(filters.private & (filters.photo | filters.document))
     async def receive_template_photo(client: Client, message: Message):
         user_id = message.from_user.id
         if not is_admin(user_id):
@@ -34,18 +37,33 @@ def register_template_handlers(app: Client):
         if user_id not in _waiting_template_upload:
             return
 
+        media = message.photo or message.document
+        if message.document and not (message.document.mime_type or "").startswith("image/"):
+            await message.reply("⚠️ يرجى إرسال صورة فقط بصيغة PNG أو JPG أو JPEG.", quote=True)
+            return
+
         _waiting_template_upload.discard(user_id)
         try:
-            file_id = message.photo.file_id
+            file_id = media.file_id
+            original_filename = getattr(message.document, "file_name", "") if message.document else f"template_{message.id}.jpg"
             local_path = await client.download_media(
-                message.photo,
-                file_name=f"data/templates/template_dl_{message.id}.jpg"
+                media,
+                file_name=f"data/templates/template_dl_{message.id}"
             )
-            dest_path = save_template_file(file_id, local_path)
+            dest_path = save_template_file(local_path, original_filename=original_filename)
             os.remove(local_path)
-            tpl_id = register_template(file_id, dest_path)
+            tpl_id, metadata = register_template(file_id, dest_path, original_filename=original_filename)
+            placeholder_note = (
+                f"\n🔎 تم اكتشاف موضع الاسم تلقائيًا عند الإحداثيات: "
+                f"X={metadata['placeholder_x']} Y={metadata['placeholder_y']}"
+                if metadata
+                else "\nℹ️ لم يتم اكتشاف كلمة الاسم تلقائيًا، وسيستخدم البوت الموضع الافتراضي الحالي."
+            )
             await message.reply(
-                f"✅ تم إضافة القالب بنجاح\n📁 قالب #{tpl_id}",
+                "✅ تم إضافة القالب بنجاح\n"
+                "🖼 أصبح القالب متاح الآن لاستخدامه في تصميم البطاقات."
+                f"\n📁 رقم القالب: {tpl_id}"
+                f"{placeholder_note}",
                 reply_markup=admin_templates_keyboard(),
                 quote=True
             )
@@ -67,11 +85,23 @@ def register_template_handlers(app: Client):
             await callback.answer()
             return
 
-        text = f"📂 القوالب المتاحة: {len(templates)} قالب\n\n"
-        for t in templates:
-            text += f"• قالب #{t['id']} - {t['added_at']}\n"
-
-        await callback.message.edit_text(text, reply_markup=admin_templates_keyboard())
+        await callback.message.edit_text(
+            f"📂 القوالب الحالية في البوت\nعدد القوالب: {len(templates)}",
+            reply_markup=admin_templates_keyboard()
+        )
+        for template in templates:
+            caption = (
+                f"🖼 قالب {template['id']}\n"
+                f"📄 الملف: {template.get('original_filename') or os.path.basename(template.get('file_path') or '')}\n"
+                f"🕒 أضيف في: {template['added_at']}"
+            )
+            file_path = template.get("file_path", "")
+            if not file_path or not os.path.exists(file_path):
+                continue
+            if os.path.splitext(file_path)[1].lower() == ".png":
+                await client.send_document(callback.message.chat.id, file_path, caption=caption)
+            else:
+                await client.send_photo(callback.message.chat.id, file_path, caption=caption)
         await callback.answer()
 
     @app.on_callback_query(filters.regex("^admin_delete_template$"))
@@ -101,7 +131,7 @@ def register_template_handlers(app: Client):
         template_id = int(callback.data.split("_")[-1])
         remove_template(template_id)
         await callback.message.edit_text(
-            f"✅ تم حذف القالب #{template_id} بنجاح",
+            "✅ تم حذف القالب بنجاح",
             reply_markup=admin_templates_keyboard()
         )
         await callback.answer()

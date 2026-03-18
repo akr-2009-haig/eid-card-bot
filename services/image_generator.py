@@ -29,11 +29,69 @@ def _get_text_size(draw: ImageDraw.ImageDraw, text: str, font) -> tuple:
     return bbox[2] - bbox[0], bbox[3] - bbox[1]
 
 
-def generate_card(template_path: str, user_name: str) -> str:
+def _pick_fill_color(img: Image.Image, x: int, y: int, w: int, h: int) -> tuple:
+    left = max(x - 10, 0)
+    top = max(y - 10, 0)
+    right = min(x + w + 10, img.width)
+    bottom = min(y + h + 10, img.height)
+    sample = img.crop((left, top, right, bottom)).convert("RGB")
+    pixels = list(sample.getdata())
+    if not pixels:
+        return 255, 255, 255
+    return tuple(sum(channel) // len(pixels) for channel in zip(*pixels))
+
+
+def _draw_name_on_placeholder(img: Image.Image, draw: ImageDraw.ImageDraw, user_name: str, template: dict) -> bool:
+    x = template.get("placeholder_x")
+    y = template.get("placeholder_y")
+    w = template.get("placeholder_w")
+    h = template.get("placeholder_h")
+    if None in (x, y, w, h):
+        return False
+
+    font_size = template.get("font_size") or max(int(h), FONT_SIZE_NAME)
+    font = _get_font(font_size)
+    text_w, text_h = _get_text_size(draw, user_name, font)
+
+    max_width = max(int(w * 2.8), text_w)
+    while text_w > max_width and font_size > 20:
+        font_size -= 2
+        font = _get_font(font_size)
+        text_w, text_h = _get_text_size(draw, user_name, font)
+
+    fill_color = _pick_fill_color(img, int(x), int(y), int(w), int(h))
+    draw.rectangle(
+        (
+            int(x) - 12,
+            int(y) - 8,
+            int(x + max(w, text_w) + 12),
+            int(y + max(h, text_h) + 8),
+        ),
+        fill=fill_color,
+    )
+    _draw_text_with_shadow(
+        draw,
+        (int(x) + max((int(w) - text_w) // 2, 0), int(y) + max((int(h) - text_h) // 2, 0)),
+        user_name,
+        font,
+        TEXT_COLOR,
+        TEXT_SHADOW_COLOR,
+    )
+    return True
+
+
+def generate_card(template_path: str, user_name: str, template: dict | None = None) -> str:
     img = Image.open(template_path).convert("RGBA")
     draw = ImageDraw.Draw(img)
 
     width, height = img.size
+
+    if template and _draw_name_on_placeholder(img, draw, user_name, template):
+        os.makedirs(GENERATED_DIR, exist_ok=True)
+        out_path = os.path.join(GENERATED_DIR, f"card_{uuid.uuid4().hex}.png")
+        img = img.convert("RGB")
+        img.save(out_path, "PNG")
+        return out_path
 
     font_label = _get_font(FONT_SIZE_LABEL)
     font_name = _get_font(FONT_SIZE_NAME)

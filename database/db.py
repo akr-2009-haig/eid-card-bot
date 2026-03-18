@@ -13,6 +13,16 @@ def get_connection():
     return conn
 
 
+def _column_exists(cursor, table_name: str, column_name: str) -> bool:
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    return any(row["name"] == column_name for row in cursor.fetchall())
+
+
+def _ensure_column(cursor, table_name: str, column_name: str, definition: str):
+    if not _column_exists(cursor, table_name, column_name):
+        cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+
+
 def init_db():
     conn = get_connection()
     cursor = conn.cursor()
@@ -36,6 +46,8 @@ def init_db():
             added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    _ensure_column(cursor, "channels", "channel_link", "TEXT DEFAULT ''")
+    _ensure_column(cursor, "channels", "chat_id", "TEXT DEFAULT ''")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS templates (
@@ -45,6 +57,13 @@ def init_db():
             added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    _ensure_column(cursor, "templates", "original_filename", "TEXT DEFAULT ''")
+    _ensure_column(cursor, "templates", "placeholder_x", "INTEGER")
+    _ensure_column(cursor, "templates", "placeholder_y", "INTEGER")
+    _ensure_column(cursor, "templates", "placeholder_w", "INTEGER")
+    _ensure_column(cursor, "templates", "placeholder_h", "INTEGER")
+    _ensure_column(cursor, "templates", "font_size", "INTEGER")
+    _ensure_column(cursor, "templates", "placeholder_text", "TEXT DEFAULT ''")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS bot_texts (
@@ -136,12 +155,22 @@ def mark_user_blocked(user_id: int):
     conn.close()
 
 
-def add_channel(username: str, title: str = "", ch_type: str = "channel"):
+def add_channel(
+    username: str,
+    title: str = "",
+    ch_type: str = "channel",
+    channel_link: str = "",
+    chat_id: str = "",
+):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO channels (channel_username, channel_title, channel_type) VALUES (?, ?, ?)",
-        (username, title, ch_type)
+        """
+        INSERT INTO channels (
+            channel_username, channel_title, channel_type, channel_link, chat_id
+        ) VALUES (?, ?, ?, ?, ?)
+        """,
+        (username, title, ch_type, channel_link, str(chat_id or ""))
     )
     conn.commit()
     conn.close()
@@ -164,12 +193,37 @@ def delete_channel(channel_id: int):
     conn.close()
 
 
-def add_template(file_id: str, file_path: str = ""):
+def add_template(
+    file_id: str,
+    file_path: str = "",
+    original_filename: str = "",
+    placeholder_x: int | None = None,
+    placeholder_y: int | None = None,
+    placeholder_w: int | None = None,
+    placeholder_h: int | None = None,
+    font_size: int | None = None,
+    placeholder_text: str = "",
+):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO templates (file_id, file_path) VALUES (?, ?)",
-        (file_id, file_path)
+        """
+        INSERT INTO templates (
+            file_id, file_path, original_filename, placeholder_x, placeholder_y,
+            placeholder_w, placeholder_h, font_size, placeholder_text
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            file_id,
+            file_path,
+            original_filename,
+            placeholder_x,
+            placeholder_y,
+            placeholder_w,
+            placeholder_h,
+            font_size,
+            placeholder_text,
+        )
     )
     last_id = cursor.lastrowid
     conn.commit()
@@ -193,6 +247,38 @@ def get_template(template_id: int):
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def update_template_path(template_id: int, file_path: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE templates SET file_path = ? WHERE id = ?", (file_path, template_id))
+    conn.commit()
+    conn.close()
+
+
+def update_template_metadata(template_id: int, metadata: dict):
+    allowed_fields = {
+        "original_filename",
+        "placeholder_x",
+        "placeholder_y",
+        "placeholder_w",
+        "placeholder_h",
+        "font_size",
+        "placeholder_text",
+    }
+    fields = {key: value for key, value in metadata.items() if key in allowed_fields}
+    if not fields:
+        return
+
+    assignments = ", ".join(f"{key} = ?" for key in fields.keys())
+    params = list(fields.values()) + [template_id]
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(f"UPDATE templates SET {assignments} WHERE id = ?", params)
+    conn.commit()
+    conn.close()
 
 
 def delete_template(template_id: int):

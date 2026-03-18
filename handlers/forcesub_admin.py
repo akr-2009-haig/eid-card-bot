@@ -10,6 +10,7 @@ from keyboards.admin_keyboard import (
     admin_forcesub_keyboard, channel_delete_keyboard, admin_back_keyboard
 )
 from utils.helpers import is_admin, logger
+from utils.telegram_links import normalize_channel_input, resolve_channel_link
 
 _waiting_channel_input: set = set()
 
@@ -23,9 +24,13 @@ def register_forcesub_admin_handlers(app: Client):
             return
         _waiting_channel_input.add(callback.from_user.id)
         await callback.message.edit_text(
-            "📎 أرسل يوزر القناة أو القروب\n\n"
-            "مثال:\n@channelname\n\n"
-            "ملاحظة: يجب أن يكون البوت أدمن في القناة/القروب"
+            "📎 أرسل رابط القناة أو القروب\n\n"
+            "يدعم البوت جميع الأنواع التالية:\n"
+            "• @channelname\n"
+            "• https://t.me/channelname\n"
+            "• https://t.me/+AbCdEfGh\n"
+            "• https://t.me/joinchat/AbCdEfGh\n\n"
+            "ملاحظة: يجب أن يكون البوت أدمن أو عضوًا داخل القناة/القروب ليتمكن من التحقق من الاشتراك."
         )
         await callback.answer()
 
@@ -42,11 +47,12 @@ def register_forcesub_admin_handlers(app: Client):
             )
             await callback.answer()
             return
-        text = f"📂 القنوات المضافة: {len(channels)}\n\n"
-        for ch in channels:
+        text = "📢 القنوات والقروبات الحالية:\n\n"
+        for index, ch in enumerate(channels, start=1):
             ch_type = ch.get("channel_type", "channel")
             label = "📢" if ch_type == "channel" else "👥"
-            text += f"{label} {ch.get('channel_title') or ch.get('channel_username')}\n"
+            title = ch.get("channel_title") or ch.get("channel_username")
+            text += f"{index}️⃣ {label} {title}\n{resolve_channel_link(ch)}\n\n"
         await callback.message.edit_text(text, reply_markup=admin_forcesub_keyboard())
         await callback.answer()
 
@@ -77,7 +83,7 @@ def register_forcesub_admin_handlers(app: Client):
         ch_id = int(callback.data.split("_")[-1])
         delete_channel(ch_id)
         await callback.message.edit_text(
-            "✅ تم حذف القناة بنجاح",
+            "✅ تم حذف القناة من الاشتراك الإجباري",
             reply_markup=admin_forcesub_keyboard()
         )
         await callback.answer()
@@ -91,30 +97,35 @@ def register_forcesub_admin_handlers(app: Client):
             return
 
         _waiting_channel_input.discard(user_id)
-        username = message.text.strip()
-
-        if not username.startswith("@"):
-            username = "@" + username
+        raw_value = message.text.strip()
 
         try:
-            chat = await client.get_chat(username)
+            parsed = normalize_channel_input(raw_value)
+            chat = await client.get_chat(parsed["lookup_value"])
             chat_type = str(chat.type).lower()
             ch_type = "group" if "group" in chat_type or "supergroup" in chat_type else "channel"
-            title = chat.title or username
-            add_channel(username, title, ch_type)
+            title = chat.title or parsed["public_username"] or raw_value
+            username = f"@{chat.username}" if getattr(chat, "username", None) else parsed["public_username"] or raw_value
+            channel_link = parsed["channel_link"]
+            if getattr(chat, "username", None):
+                channel_link = f"https://t.me/{chat.username}"
+
+            add_channel(username, title, ch_type, channel_link=channel_link, chat_id=str(chat.id))
             type_label = "القروب" if ch_type == "group" else "القناة"
             await message.reply(
                 f"✅ تم إضافة {type_label} للاشتراك الإجباري\n\n"
-                f"📋 الاسم: {title}\n👤 اليوزر: {username}",
+                f"📋 الاسم: {title}\n"
+                f"🔗 الرابط: {channel_link}\n"
+                f"🆔 المعرف: {chat.id}",
                 reply_markup=admin_forcesub_keyboard(),
                 quote=True
             )
         except Exception as e:
-            logger.warning(f"Channel add error for {username}: {e}")
-            add_channel(username, "", "channel")
+            _waiting_channel_input.add(user_id)
+            logger.warning(f"Channel add error for {raw_value}: {e}")
             await message.reply(
-                f"✅ تم إضافة {username} للاشتراك الإجباري\n\n"
-                f"⚠️ تعذّر جلب معلومات القناة. تأكد أن البوت أدمن فيها.",
-                reply_markup=admin_forcesub_keyboard(),
+                "❌ تعذر إضافة الرابط.\n\n"
+                "تأكد من أن الرابط صحيح وأن البوت أدمن أو عضو داخل القناة/القروب، ثم أرسل الرابط مرة أخرى.",
+                reply_markup=admin_back_keyboard(),
                 quote=True
             )
