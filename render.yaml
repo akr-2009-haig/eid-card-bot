@@ -1,0 +1,20 @@
+services:
+  - type: worker
+    name: eid-card-bot
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: STORAGE_DIR
+        value: /var/data
+      - key: BOT_TOKEN
+      - key: API_ID
+      - key: API_HASH
+      - key: ADMIN_IDS
+    disk:
+      name: eid-card-bot-data
+      mountPath: /var/data
+      sizeGB: 1

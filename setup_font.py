@@ -5,12 +5,13 @@ Usage: python setup_font.py
 import os
 import urllib.request
 
+from config import FONT_PATH, FONTS_DIR
+
 FONT_URL = "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoNaskhArabic/NotoNaskhArabic-Regular.ttf"
-FONT_PATH = "data/fonts/arabic.ttf"
 
 
 def download_font():
-    os.makedirs("data/fonts", exist_ok=True)
+    os.makedirs(FONTS_DIR, exist_ok=True)
     if os.path.exists(FONT_PATH):
         print(f"Font already exists at {FONT_PATH}")
         return

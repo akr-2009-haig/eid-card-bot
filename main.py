@@ -4,7 +4,14 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pyrogram import Client
-from config import BOT_TOKEN, API_ID, API_HASH
+from config import (
+    BOT_TOKEN,
+    API_ID,
+    API_HASH,
+    TEMPLATES_DIR,
+    GENERATED_DIR,
+    LOG_FILE,
+)
 from database.db import init_db
 from utils.helpers import logger
 
@@ -44,11 +51,16 @@ def create_app() -> Client:
     )
 
 
+def ensure_runtime_directories():
+    for path in (TEMPLATES_DIR, GENERATED_DIR, os.path.dirname(LOG_FILE)):
+        os.makedirs(path, exist_ok=True)
+
+
 def main():
     missing_config = validate_runtime_config()
     if missing_config:
         logger.error(
-            "Missing required Telegram configuration: %s. Update config.py before running the bot.",
+            "Missing required Telegram configuration: %s. Set environment variables or update config.py before running the bot.",
             ", ".join(missing_config)
         )
         return
@@ -57,10 +69,7 @@ def main():
     init_db()
     logger.info("Database initialized.")
 
-    os.makedirs("data/templates", exist_ok=True)
-    os.makedirs("data/fonts", exist_ok=True)
-    os.makedirs("data/generated", exist_ok=True)
-    os.makedirs("logs", exist_ok=True)
+    ensure_runtime_directories()
 
     app = create_app()
 
