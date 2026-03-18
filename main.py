@@ -9,7 +9,6 @@ from config import (
     API_ID,
     API_HASH,
     TEMPLATES_DIR,
-    FONTS_DIR,
     GENERATED_DIR,
     LOG_FILE,
 )
@@ -53,7 +52,7 @@ def create_app() -> Client:
 
 
 def ensure_runtime_directories():
-    for path in (TEMPLATES_DIR, FONTS_DIR, GENERATED_DIR, os.path.dirname(LOG_FILE)):
+    for path in (TEMPLATES_DIR, GENERATED_DIR, os.path.dirname(LOG_FILE)):
         os.makedirs(path, exist_ok=True)
 
 

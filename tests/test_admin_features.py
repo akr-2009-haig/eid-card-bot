@@ -159,6 +159,22 @@ class RuntimeConfigTests(unittest.TestCase):
         missing = validate_runtime_config("123456:ABC", 12345, "hash")
         self.assertEqual(missing, [])
 
+    def test_config_admin_ids_falls_back_when_environment_value_is_invalid(self):
+        original_admin_ids = os.environ.get("ADMIN_IDS")
+        os.environ["ADMIN_IDS"] = " , invalid , "
+
+        try:
+            import config
+            reloaded_config = importlib.reload(config)
+            self.assertEqual(reloaded_config.ADMIN_IDS, [123456789])
+        finally:
+            if original_admin_ids is None:
+                os.environ.pop("ADMIN_IDS", None)
+            else:
+                os.environ["ADMIN_IDS"] = original_admin_ids
+            import config
+            importlib.reload(config)
+
 
 if __name__ == "__main__":
     unittest.main()
