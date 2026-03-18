@@ -10,6 +10,10 @@ from config import (
     TEXT_COLOR, TEXT_SHADOW_COLOR, GENERATED_DIR
 )
 
+PLACEHOLDER_WIDTH_MULTIPLIER = 2.8
+PLACEHOLDER_PADDING_X = 12
+PLACEHOLDER_PADDING_Y = 8
+
 
 def _get_font(size: int) -> ImageFont.FreeTypeFont:
     try:
@@ -36,6 +40,8 @@ def _pick_fill_color(img: Image.Image, x: int, y: int, w: int, h: int) -> tuple:
     bottom = min(y + h + 10, img.height)
     sample = img.crop((left, top, right, bottom)).convert("RGB")
     pixels = list(sample.getdata())
+    sampled_pixels = pixels[::8] if len(pixels) > 8 else pixels
+    pixels = sampled_pixels
     if not pixels:
         return 255, 255, 255
     return tuple(sum(channel) // len(pixels) for channel in zip(*pixels))
@@ -53,7 +59,8 @@ def _draw_name_on_placeholder(img: Image.Image, draw: ImageDraw.ImageDraw, user_
     font = _get_font(font_size)
     text_w, text_h = _get_text_size(draw, user_name, font)
 
-    max_width = max(int(w * 2.8), text_w)
+    # Allow the replacement name to grow beyond the detected placeholder box so longer names still fit naturally.
+    max_width = max(int(w * PLACEHOLDER_WIDTH_MULTIPLIER), text_w)
     while text_w > max_width and font_size > 20:
         font_size -= 2
         font = _get_font(font_size)
@@ -62,10 +69,10 @@ def _draw_name_on_placeholder(img: Image.Image, draw: ImageDraw.ImageDraw, user_
     fill_color = _pick_fill_color(img, int(x), int(y), int(w), int(h))
     draw.rectangle(
         (
-            int(x) - 12,
-            int(y) - 8,
-            int(x + max(w, text_w) + 12),
-            int(y + max(h, text_h) + 8),
+            int(x) - PLACEHOLDER_PADDING_X,
+            int(y) - PLACEHOLDER_PADDING_Y,
+            int(x + max(w, text_w) + PLACEHOLDER_PADDING_X),
+            int(y + max(h, text_h) + PLACEHOLDER_PADDING_Y),
         ),
         fill=fill_color,
     )

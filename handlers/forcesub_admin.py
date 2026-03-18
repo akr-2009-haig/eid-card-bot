@@ -96,7 +96,6 @@ def register_forcesub_admin_handlers(app: Client):
         if user_id not in _waiting_channel_input:
             return
 
-        _waiting_channel_input.discard(user_id)
         raw_value = message.text.strip()
 
         try:
@@ -105,12 +104,14 @@ def register_forcesub_admin_handlers(app: Client):
             chat_type = str(chat.type).lower()
             ch_type = "group" if "group" in chat_type or "supergroup" in chat_type else "channel"
             title = chat.title or parsed["public_username"] or raw_value
+            # Prefer the real Telegram username when available, then the parsed public username, then the raw input.
             username = f"@{chat.username}" if getattr(chat, "username", None) else parsed["public_username"] or raw_value
             channel_link = parsed["channel_link"]
             if getattr(chat, "username", None):
                 channel_link = f"https://t.me/{chat.username}"
 
             add_channel(username, title, ch_type, channel_link=channel_link, chat_id=str(chat.id))
+            _waiting_channel_input.discard(user_id)
             type_label = "القروب" if ch_type == "group" else "القناة"
             await message.reply(
                 f"✅ تم إضافة {type_label} للاشتراك الإجباري\n\n"
@@ -121,7 +122,6 @@ def register_forcesub_admin_handlers(app: Client):
                 quote=True
             )
         except Exception as e:
-            _waiting_channel_input.add(user_id)
             logger.warning(f"Channel add error for {raw_value}: {e}")
             await message.reply(
                 "❌ تعذر إضافة الرابط.\n\n"

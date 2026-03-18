@@ -8,7 +8,7 @@ from PIL import Image
 
 try:
     import pytesseract
-except Exception:  # pragma: no cover - optional runtime dependency
+except ImportError:  # pragma: no cover - optional runtime dependency
     pytesseract = None
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,10 +16,12 @@ from config import TEMPLATES_DIR
 from database.db import add_template, delete_template
 
 PLACEHOLDER_PATTERNS = {"الاسم", "اسم"}
+# The strip pattern removes common placeholder wrappers like [الاسم], (الاسم), and decorative circles such as ⭕ الاسم.
+OCR_STRIP_PATTERN = r"[\s\[\]\(\){}<>⭕•\-_=+*]+"
 
 
 def _clean_ocr_text(value: str) -> str:
-    return re.sub(r"[\s\[\]\(\){}<>⭕•\-_=+*]+", "", value or "").strip().lower()
+    return re.sub(OCR_STRIP_PATTERN, "", value or "").strip().lower()
 
 
 def detect_name_placeholder(image_path: str) -> dict:
@@ -41,7 +43,7 @@ def detect_name_placeholder(image_path: str) -> dict:
         normalized = _clean_ocr_text(raw_text)
         if not normalized:
             continue
-        if not any(pattern in normalized for pattern in PLACEHOLDER_PATTERNS):
+        if normalized not in PLACEHOLDER_PATTERNS:
             continue
 
         left = int(data["left"][index])
@@ -63,6 +65,8 @@ def detect_name_placeholder(image_path: str) -> dict:
 def save_template_file(local_path: str, original_filename: str = "") -> str:
     os.makedirs(TEMPLATES_DIR, exist_ok=True)
     ext = os.path.splitext(original_filename or local_path)[1].lower() or ".jpg"
+    if ext == ".jpeg":
+        ext = ".jpg"
     if ext not in {".png", ".jpg", ".jpeg"}:
         ext = ".jpg"
     dest = os.path.join(TEMPLATES_DIR, f"template_{uuid.uuid4().hex}{ext}")

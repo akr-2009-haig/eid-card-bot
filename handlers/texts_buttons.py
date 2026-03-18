@@ -1,5 +1,6 @@
 import os
 import sys
+from urllib.parse import urlparse
 
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
@@ -15,6 +16,15 @@ from utils.helpers import is_admin, logger
 _admin_text_state: dict = {}
 _waiting_button_input: set = set()
 _button_input_data: dict = {}
+
+
+def _is_valid_button_url(url: str) -> bool:
+    if url.startswith("tg://"):
+        parsed = urlparse(url)
+        return bool(parsed.scheme and parsed.netloc)
+
+    parsed = urlparse(url)
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
 def register_texts_buttons_handlers(app: Client):
@@ -99,19 +109,21 @@ def register_texts_buttons_handlers(app: Client):
 
             if step == "combined":
                 parts = [part.strip() for part in message.text.splitlines() if part.strip()]
-                if len(parts) < 2:
+                if len(parts) != 2:
                     await message.reply(
                         "⚠️ الصيغة غير صحيحة.\n\n"
-                        "أرسل اسم الزر في السطر الأول والرابط في السطر الثاني.",
+                        "أرسل سطرين فقط:\n"
+                        "1) اسم الزر\n"
+                        "2) الرابط",
                         quote=True
                     )
                     return
 
                 label = parts[0]
                 url = parts[1]
-                if not (url.startswith("http://") or url.startswith("https://") or url.startswith("tg://")):
+                if not _is_valid_button_url(url):
                     await message.reply(
-                        "⚠️ الرابط غير صالح. أرسل رابطًا يبدأ بـ https:// أو http:// أو tg://",
+                        "⚠️ الرابط غير صالح. أرسل رابطًا صحيحًا يبدأ بـ https:// أو http:// أو tg://",
                         quote=True
                     )
                     return

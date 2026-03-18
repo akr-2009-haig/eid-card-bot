@@ -45,11 +45,11 @@ def register_template_handlers(app: Client):
         _waiting_template_upload.discard(user_id)
         try:
             file_id = media.file_id
-            original_filename = getattr(message.document, "file_name", "") if message.document else f"template_{message.id}.jpg"
             local_path = await client.download_media(
                 media,
                 file_name=f"data/templates/template_dl_{message.id}"
             )
+            original_filename = getattr(message.document, "file_name", "") if message.document else os.path.basename(local_path)
             dest_path = save_template_file(local_path, original_filename=original_filename)
             os.remove(local_path)
             tpl_id, metadata = register_template(file_id, dest_path, original_filename=original_filename)

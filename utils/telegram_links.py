@@ -34,7 +34,7 @@ def normalize_channel_input(raw_value: str) -> dict:
             "channel_link": f"https://t.me/{slug}",
         }
 
-    if re.fullmatch(r"[A-Za-z0-9_]{4,}", value):
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{4,31}", value):
         return {
             "lookup_value": f"@{value}",
             "public_username": f"@{value}",

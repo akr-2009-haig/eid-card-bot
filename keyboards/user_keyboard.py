@@ -20,7 +20,7 @@ def forcesub_keyboard(channels: list) -> InlineKeyboardMarkup:
         label_prefix = "📢 قناة" if ch_type == "channel" else "👥 قروب"
         title = ch.get("channel_title") or ch.get("channel_username", "")
         url = resolve_channel_link(ch)
-        rows.append([InlineKeyboardButton(f"{label_prefix} {index} | {title}", url=url)])
+        rows.append([InlineKeyboardButton(f"{label_prefix} {index}️⃣ | {title}", url=url)])
     rows.append([InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_sub")])
     return InlineKeyboardMarkup(rows)
 
