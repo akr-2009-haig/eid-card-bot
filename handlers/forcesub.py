@@ -38,7 +38,7 @@ def register_forcesub_handler(app: Client):
             await callback.answer("✅ تم التحقق بنجاح!", show_alert=False)
         else:
             await callback.answer(
-                "⚠️ لم تشترك في جميع القنوات بعد!",
+                "❌ يجب الاشتراك في جميع القنوات أولاً",
                 show_alert=True
             )
             text = get_text("forcesub_message")

@@ -68,9 +68,9 @@ def admin_back_keyboard() -> InlineKeyboardMarkup:
 
 def template_delete_keyboard(templates: list) -> InlineKeyboardMarkup:
     rows = []
-    for t in templates:
+    for index, t in enumerate(templates, start=1):
         rows.append([InlineKeyboardButton(
-            f"🗑 قالب #{t['id']}",
+            f"قالب {index}",
             callback_data=f"admin_del_tpl_{t['id']}"
         )])
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data="admin_templates")])

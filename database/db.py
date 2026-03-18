@@ -5,12 +5,65 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DATABASE_PATH
 
+ALLOWED_SCHEMA_TABLES = {"channels", "templates"}
+ALLOWED_SCHEMA_COLUMNS = {
+    "channels": {"channel_link", "chat_id"},
+    "templates": {
+        "original_filename",
+        "placeholder_x",
+        "placeholder_y",
+        "placeholder_w",
+        "placeholder_h",
+        "font_size",
+        "placeholder_text",
+    },
+}
+ALLOWED_UPDATE_TEMPLATE_FIELDS = ALLOWED_SCHEMA_COLUMNS["templates"]
+SCHEMA_TABLE_NAMES = {
+    "channels": "channels",
+    "templates": "templates",
+}
+SCHEMA_COLUMN_DEFINITIONS = {
+    "channels": {
+        "channel_link": "TEXT DEFAULT ''",
+        "chat_id": "TEXT DEFAULT ''",
+    },
+    "templates": {
+        "original_filename": "TEXT DEFAULT ''",
+        "placeholder_x": "INTEGER",
+        "placeholder_y": "INTEGER",
+        "placeholder_w": "INTEGER",
+        "placeholder_h": "INTEGER",
+        "font_size": "INTEGER",
+        "placeholder_text": "TEXT DEFAULT ''",
+    },
+}
+
 
 def get_connection():
     os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _column_exists(cursor, table_name: str, column_name: str) -> bool:
+    if table_name not in ALLOWED_SCHEMA_TABLES or column_name not in ALLOWED_SCHEMA_COLUMNS.get(table_name, set()):
+        raise ValueError("Unsupported schema lookup")
+    safe_table_name = SCHEMA_TABLE_NAMES[table_name]
+    # SQLite PRAGMA identifiers cannot be parameterized; this value is selected only from a fixed internal whitelist.
+    cursor.execute(f"PRAGMA table_info({safe_table_name})")
+    return any(row["name"] == column_name for row in cursor.fetchall())
+
+
+def _ensure_column(cursor, table_name: str, column_name: str):
+    if table_name not in ALLOWED_SCHEMA_TABLES or column_name not in ALLOWED_SCHEMA_COLUMNS.get(table_name, set()):
+        raise ValueError("Unsupported schema change")
+    safe_table_name = SCHEMA_TABLE_NAMES[table_name]
+    safe_definition = SCHEMA_COLUMN_DEFINITIONS[table_name][column_name]
+    if not _column_exists(cursor, table_name, column_name):
+        # ALTER TABLE identifiers and definitions are taken only from constant internal mappings above.
+        cursor.execute(f"ALTER TABLE {safe_table_name} ADD COLUMN {column_name} {safe_definition}")
 
 
 def init_db():
@@ -36,6 +89,8 @@ def init_db():
             added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    _ensure_column(cursor, "channels", "channel_link")
+    _ensure_column(cursor, "channels", "chat_id")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS templates (
@@ -45,6 +100,13 @@ def init_db():
             added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    _ensure_column(cursor, "templates", "original_filename")
+    _ensure_column(cursor, "templates", "placeholder_x")
+    _ensure_column(cursor, "templates", "placeholder_y")
+    _ensure_column(cursor, "templates", "placeholder_w")
+    _ensure_column(cursor, "templates", "placeholder_h")
+    _ensure_column(cursor, "templates", "font_size")
+    _ensure_column(cursor, "templates", "placeholder_text")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS bot_texts (
@@ -136,12 +198,22 @@ def mark_user_blocked(user_id: int):
     conn.close()
 
 
-def add_channel(username: str, title: str = "", ch_type: str = "channel"):
+def add_channel(
+    username: str,
+    title: str = "",
+    ch_type: str = "channel",
+    channel_link: str = "",
+    chat_id: str = "",
+):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO channels (channel_username, channel_title, channel_type) VALUES (?, ?, ?)",
-        (username, title, ch_type)
+        """
+        INSERT INTO channels (
+            channel_username, channel_title, channel_type, channel_link, chat_id
+        ) VALUES (?, ?, ?, ?, ?)
+        """,
+        (username, title, ch_type, channel_link, str(chat_id or ""))
     )
     conn.commit()
     conn.close()
@@ -164,12 +236,37 @@ def delete_channel(channel_id: int):
     conn.close()
 
 
-def add_template(file_id: str, file_path: str = ""):
+def add_template(
+    file_id: str,
+    file_path: str = "",
+    original_filename: str = "",
+    placeholder_x: int | None = None,
+    placeholder_y: int | None = None,
+    placeholder_w: int | None = None,
+    placeholder_h: int | None = None,
+    font_size: int | None = None,
+    placeholder_text: str = "",
+):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO templates (file_id, file_path) VALUES (?, ?)",
-        (file_id, file_path)
+        """
+        INSERT INTO templates (
+            file_id, file_path, original_filename, placeholder_x, placeholder_y,
+            placeholder_w, placeholder_h, font_size, placeholder_text
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            file_id,
+            file_path,
+            original_filename,
+            placeholder_x,
+            placeholder_y,
+            placeholder_w,
+            placeholder_h,
+            font_size,
+            placeholder_text,
+        )
     )
     last_id = cursor.lastrowid
     conn.commit()
@@ -193,6 +290,31 @@ def get_template(template_id: int):
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def update_template_path(template_id: int, file_path: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE templates SET file_path = ? WHERE id = ?", (file_path, template_id))
+    conn.commit()
+    conn.close()
+
+
+def update_template_metadata(template_id: int, metadata: dict):
+    fields = {key: value for key, value in metadata.items() if key in ALLOWED_UPDATE_TEMPLATE_FIELDS}
+    if not fields:
+        return
+
+    ordered_fields = [field for field in SCHEMA_COLUMN_DEFINITIONS["templates"].keys() if field in fields]
+    # Column names come from a constant whitelist; only values remain parameterized user data.
+    assignments = ", ".join(f"{field} = ?" for field in ordered_fields)
+    params = [fields[field] for field in ordered_fields] + [template_id]
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(f"UPDATE templates SET {assignments} WHERE id = ?", params)
+    conn.commit()
+    conn.close()
 
 
 def delete_template(template_id: int):

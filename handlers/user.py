@@ -7,7 +7,7 @@ from pyrogram.types import Message, CallbackQuery
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database.db import (
     get_text, get_buttons, get_channels, get_templates,
-    add_user, log_generated_card
+    add_user, log_generated_card, update_template_path
 )
 from keyboards.user_keyboard import (
     main_menu_keyboard, forcesub_keyboard, back_home_keyboard, card_result_keyboard
@@ -93,16 +93,10 @@ def register_user_handlers(app: Client):
                     file_name=f"data/templates/template_{template['id']}_dl.jpg"
                 )
                 template_path = downloaded
-                from database.db import get_connection
-                conn = get_connection()
-                conn.execute(
-                    "UPDATE templates SET file_path = ? WHERE id = ?",
-                    (template_path, template["id"])
-                )
-                conn.commit()
-                conn.close()
+                update_template_path(template["id"], template_path)
+                template["file_path"] = template_path
 
-            card_path = generate_card(template_path, name)
+            card_path = generate_card(template_path, name, template=template)
             log_generated_card(user.id, name, template["id"])
 
             card_ready_text = get_text("card_ready_message")

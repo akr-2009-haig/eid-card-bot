@@ -59,7 +59,8 @@ def register_admin_handler(app: Client):
             await callback.answer("⛔ ممنوع", show_alert=True)
             return
         await callback.message.edit_text(
-            "🎨 إدارة قوالب بطاقات العيد",
+            "🎨 إدارة قوالب بطاقات العيد\n"
+            "يمكنك من هنا إدارة القوالب التي يستخدمها البوت لتصميم بطاقات التهنئة.",
             reply_markup=admin_templates_keyboard()
         )
         await callback.answer()
@@ -70,7 +71,8 @@ def register_admin_handler(app: Client):
             await callback.answer("⛔ ممنوع", show_alert=True)
             return
         await callback.message.edit_text(
-            "🔒 إدارة الاشتراك الإجباري",
+            "🔒 إدارة الاشتراك الإجباري\n"
+            "يمكنك إضافة أو حذف القنوات أو القروبات التي يجب على المستخدم الاشتراك فيها قبل استخدام البوت.",
             reply_markup=admin_forcesub_keyboard()
         )
         await callback.answer()
@@ -81,7 +83,8 @@ def register_admin_handler(app: Client):
             await callback.answer("⛔ ممنوع", show_alert=True)
             return
         await callback.message.edit_text(
-            "📝 إدارة النصوص والأزرار",
+            "📝 إدارة النصوص والأزرار\n"
+            "يمكنك من هنا تعديل رسائل البوت والأزرار التي تظهر للمستخدمين.",
             reply_markup=admin_texts_keyboard()
         )
         await callback.answer()
@@ -92,7 +95,7 @@ def register_admin_handler(app: Client):
             await callback.answer("⛔ ممنوع", show_alert=True)
             return
         await callback.message.edit_text(
-            "🔘 إدارة الأزرار",
+            "🔘 إدارة الأزرار التي تظهر أسفل البطاقة",
             reply_markup=admin_buttons_keyboard()
         )
         await callback.answer()
@@ -142,7 +145,15 @@ def register_admin_handler(app: Client):
         set_state(callback.from_user.id, text_key)
 
         current = get_text(text_key)
+        prompt_map = {
+            "start_message": "✏️ أرسل رسالة البداية الجديدة",
+            "ask_name_message": "✏️ أرسل رسالة طلب الاسم الجديدة",
+            "designing_message": "✏️ أرسل رسالة الانتظار أثناء تصميم البطاقة",
+            "card_ready_message": "✏️ أرسل الرسالة التي ستظهر بعد إرسال البطاقة",
+            "forcesub_message": "✏️ أرسل رسالة الاشتراك الجديدة",
+        }
         await callback.message.edit_text(
-            f"✏️ أرسل النص الجديد\n\nالنص الحالي:\n\n{current}"
+            f"{prompt_map.get(text_key, '✏️ أرسل النص الجديد')}\n\n"
+            f"النص الحالي:\n\n{current}"
         )
         await callback.answer()
