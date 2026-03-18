@@ -2,7 +2,7 @@
 
 ## التشغيل السريع
 
-1. حدّث ملف `/home/runner/work/eid-card-bot/eid-card-bot/config.py` بالقيم الحقيقية التالية:
+1. حدّث ملف `config.py` بالقيم الحقيقية التالية:
    - `BOT_TOKEN`
    - `API_ID`
    - `API_HASH`
@@ -22,7 +22,7 @@ python main.py
 
 ## وثيقة الاستضافة
 
-- راجع الملف `/home/runner/work/eid-card-bot/eid-card-bot/HOSTING.md` لمعرفة الاستضافات المجانية والرخيصة المناسبة للبوت.
+- راجع الملف `HOSTING.md` لمعرفة الاستضافات المجانية والرخيصة المناسبة للبوت.
 
 فكرة البوت
 

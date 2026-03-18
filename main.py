@@ -48,7 +48,7 @@ def main():
     missing_config = validate_runtime_config()
     if missing_config:
         logger.error(
-            "Missing required Telegram configuration: %s. Update /home/runner/work/eid-card-bot/eid-card-bot/config.py before running the bot.",
+            "Missing required Telegram configuration: %s. Update config.py before running the bot.",
             ", ".join(missing_config)
         )
         return
