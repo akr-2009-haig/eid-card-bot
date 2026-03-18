@@ -14,7 +14,7 @@ from keyboards.user_keyboard import (
 )
 from services.subscription_checker import check_subscription
 from services.image_generator import generate_card, pick_random_template
-from utils.helpers import logger
+from utils.helpers import get_full_name, logger
 from utils.rate_limit import is_rate_limited, reset_rate_limit
 
 _waiting_for_name: set = set()
@@ -25,7 +25,7 @@ def register_user_handlers(app: Client):
     @app.on_callback_query(filters.regex("^design_card$"))
     async def design_card_callback(client: Client, callback: CallbackQuery):
         user = callback.from_user
-        add_user(user.id, user.username or "", user.full_name or "")
+        add_user(user.id, user.username or "", get_full_name(user))
 
         channels = get_channels()
         if channels:

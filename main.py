@@ -19,25 +19,40 @@ from handlers.ads import register_ads_handlers
 from handlers.admin_text_handler import register_admin_text_message_handler
 
 
+def validate_runtime_config(
+    bot_token: str = BOT_TOKEN,
+    api_id: int = API_ID,
+    api_hash: str = API_HASH,
+) -> list[str]:
+    missing = []
+    if not bot_token or bot_token == "YOUR_BOT_TOKEN_HERE":
+        missing.append("BOT_TOKEN")
+    if not api_id:
+        missing.append("API_ID")
+    if not api_hash:
+        missing.append("API_HASH")
+    return missing
+
+
 def create_app() -> Client:
-    if not API_ID or not API_HASH:
-        app = Client(
-            name="eid_card_bot",
-            bot_token=BOT_TOKEN,
-            in_memory=True
-        )
-    else:
-        app = Client(
-            name="eid_card_bot",
-            api_id=API_ID,
-            api_hash=API_HASH,
-            bot_token=BOT_TOKEN,
-            in_memory=True
-        )
-    return app
+    return Client(
+        name="eid_card_bot",
+        api_id=API_ID,
+        api_hash=API_HASH,
+        bot_token=BOT_TOKEN,
+        in_memory=True
+    )
 
 
 def main():
+    missing_config = validate_runtime_config()
+    if missing_config:
+        logger.error(
+            "Missing required Telegram configuration: %s. Update /home/runner/work/eid-card-bot/eid-card-bot/config.py before running the bot.",
+            ", ".join(missing_config)
+        )
+        return
+
     logger.info("Initializing database...")
     init_db()
     logger.info("Database initialized.")

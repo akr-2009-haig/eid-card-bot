@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database.db import add_user, get_text, get_buttons, get_channels
 from keyboards.user_keyboard import main_menu_keyboard, forcesub_keyboard, back_home_keyboard
 from services.subscription_checker import check_subscription
-from utils.helpers import is_admin
+from utils.helpers import get_full_name, is_admin
 
 
 def register_start_handler(app: Client):
@@ -16,7 +16,7 @@ def register_start_handler(app: Client):
     @app.on_message(filters.command("start") & filters.private)
     async def start_handler(client: Client, message: Message):
         user = message.from_user
-        add_user(user.id, user.username or "", user.full_name or "")
+        add_user(user.id, user.username or "", get_full_name(user))
 
         channels = get_channels()
         if channels:
@@ -41,7 +41,7 @@ def register_start_handler(app: Client):
     @app.on_callback_query(filters.regex("^back_home$"))
     async def back_home_callback(client: Client, callback: CallbackQuery):
         user = callback.from_user
-        add_user(user.id, user.username or "", user.full_name or "")
+        add_user(user.id, user.username or "", get_full_name(user))
 
         channels = get_channels()
         if channels:
@@ -52,6 +52,7 @@ def register_start_handler(app: Client):
                     text,
                     reply_markup=forcesub_keyboard(missing)
                 )
+                await callback.answer()
                 return
 
         extra_buttons = get_buttons()
