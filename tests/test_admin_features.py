@@ -105,44 +105,43 @@ class RuntimeConfigTests(unittest.TestCase):
                 "FONT_PATH",
             )
         }
-        temp_dir = tempfile.TemporaryDirectory()
-        env_updates = {
-            "BOT_TOKEN": "999999:XYZ",
-            "API_ID": "67890",
-            "API_HASH": "render-hash",
-            "ADMIN_IDS": "1, 2,invalid,3",
-            "STORAGE_DIR": temp_dir.name,
-            "DATABASE_PATH": os.path.join(temp_dir.name, "custom", "bot.db"),
-            "TEMPLATES_DIR": os.path.join(temp_dir.name, "templates"),
-            "FONTS_DIR": os.path.join(temp_dir.name, "fonts"),
-            "GENERATED_DIR": os.path.join(temp_dir.name, "generated"),
-            "LOG_FILE": os.path.join(temp_dir.name, "logs", "bot.log"),
-            "FONT_PATH": os.path.join(temp_dir.name, "fonts", "arabic.ttf"),
-        }
-        os.environ.update(env_updates)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_updates = {
+                "BOT_TOKEN": "999999:XYZ",
+                "API_ID": "67890",
+                "API_HASH": "render-hash",
+                "ADMIN_IDS": "1, 2,invalid,3",
+                "STORAGE_DIR": temp_dir,
+                "DATABASE_PATH": os.path.join(temp_dir, "custom", "bot.db"),
+                "TEMPLATES_DIR": os.path.join(temp_dir, "templates"),
+                "FONTS_DIR": os.path.join(temp_dir, "fonts"),
+                "GENERATED_DIR": os.path.join(temp_dir, "generated"),
+                "LOG_FILE": os.path.join(temp_dir, "logs", "bot.log"),
+                "FONT_PATH": os.path.join(temp_dir, "fonts", "arabic.ttf"),
+            }
+            os.environ.update(env_updates)
 
-        try:
-            import config
-            reloaded_config = importlib.reload(config)
-            self.assertEqual(reloaded_config.BOT_TOKEN, "999999:XYZ")
-            self.assertEqual(reloaded_config.API_ID, 67890)
-            self.assertEqual(reloaded_config.API_HASH, "render-hash")
-            self.assertEqual(reloaded_config.ADMIN_IDS, [1, 2, 3])
-            self.assertEqual(reloaded_config.DATABASE_PATH, env_updates["DATABASE_PATH"])
-            self.assertEqual(reloaded_config.TEMPLATES_DIR, env_updates["TEMPLATES_DIR"])
-            self.assertEqual(reloaded_config.FONTS_DIR, env_updates["FONTS_DIR"])
-            self.assertEqual(reloaded_config.GENERATED_DIR, env_updates["GENERATED_DIR"])
-            self.assertEqual(reloaded_config.LOG_FILE, env_updates["LOG_FILE"])
-            self.assertEqual(reloaded_config.FONT_PATH, env_updates["FONT_PATH"])
-        finally:
-            for key, value in original_values.items():
-                if value is None:
-                    os.environ.pop(key, None)
-                else:
-                    os.environ[key] = value
-            import config
-            importlib.reload(config)
-            temp_dir.cleanup()
+            try:
+                import config
+                reloaded_config = importlib.reload(config)
+                self.assertEqual(reloaded_config.BOT_TOKEN, "999999:XYZ")
+                self.assertEqual(reloaded_config.API_ID, 67890)
+                self.assertEqual(reloaded_config.API_HASH, "render-hash")
+                self.assertEqual(reloaded_config.ADMIN_IDS, [1, 2, 3])
+                self.assertEqual(reloaded_config.DATABASE_PATH, env_updates["DATABASE_PATH"])
+                self.assertEqual(reloaded_config.TEMPLATES_DIR, env_updates["TEMPLATES_DIR"])
+                self.assertEqual(reloaded_config.FONTS_DIR, env_updates["FONTS_DIR"])
+                self.assertEqual(reloaded_config.GENERATED_DIR, env_updates["GENERATED_DIR"])
+                self.assertEqual(reloaded_config.LOG_FILE, env_updates["LOG_FILE"])
+                self.assertEqual(reloaded_config.FONT_PATH, env_updates["FONT_PATH"])
+            finally:
+                for key, value in original_values.items():
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
+                import config
+                importlib.reload(config)
 
     def test_get_full_name_joins_first_and_last_name(self):
         user = SimpleNamespace(first_name="محمد", last_name="أحمد")
