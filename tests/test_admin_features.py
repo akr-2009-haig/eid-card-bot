@@ -1,8 +1,11 @@
 import os
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 from database import db
+from main import validate_runtime_config
+from utils.helpers import get_full_name
 from utils.telegram_links import normalize_channel_input, resolve_channel_link, resolve_channel_target
 
 
@@ -47,6 +50,20 @@ class AdminFeatureStorageTests(unittest.TestCase):
         self.assertEqual(template["placeholder_x"], 520)
         self.assertEqual(template["placeholder_text"], "[الاسم]")
 
+    def test_add_user_updates_missing_profile_fields(self):
+        db.add_user(1001, "", "")
+        db.add_user(1001, "eid_user", "محمد أحمد")
+        user = db.get_user(1001)
+        self.assertEqual(user["username"], "eid_user")
+        self.assertEqual(user["full_name"], "محمد أحمد")
+
+    def test_add_user_preserves_existing_profile_fields_when_new_values_are_blank(self):
+        db.add_user(1002, "eid_user", "محمد أحمد")
+        db.add_user(1002, "", "")
+        user = db.get_user(1002)
+        self.assertEqual(user["username"], "eid_user")
+        self.assertEqual(user["full_name"], "محمد أحمد")
+
 
 class TelegramLinkParsingTests(unittest.TestCase):
     def test_normalize_public_username(self):
@@ -67,6 +84,24 @@ class TelegramLinkParsingTests(unittest.TestCase):
         }
         self.assertEqual(resolve_channel_link(channel), "https://t.me/channelname")
         self.assertEqual(resolve_channel_target(channel), -100222)
+
+
+class RuntimeConfigTests(unittest.TestCase):
+    def test_get_full_name_joins_first_and_last_name(self):
+        user = SimpleNamespace(first_name="محمد", last_name="أحمد")
+        self.assertEqual(get_full_name(user), "محمد أحمد")
+
+    def test_get_full_name_handles_missing_last_name(self):
+        user = SimpleNamespace(first_name="محمد", last_name=None)
+        self.assertEqual(get_full_name(user), "محمد")
+
+    def test_validate_runtime_config_detects_placeholders(self):
+        missing = validate_runtime_config("YOUR_BOT_TOKEN_HERE", 0, "")
+        self.assertEqual(missing, ["BOT_TOKEN", "API_ID", "API_HASH"])
+
+    def test_validate_runtime_config_accepts_complete_values(self):
+        missing = validate_runtime_config("123456:ABC", 12345, "hash")
+        self.assertEqual(missing, [])
 
 
 if __name__ == "__main__":

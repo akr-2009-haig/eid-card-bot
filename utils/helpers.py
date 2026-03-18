@@ -24,6 +24,12 @@ def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
 
+def get_full_name(user) -> str:
+    first_name = getattr(user, "first_name", "") or ""
+    last_name = getattr(user, "last_name", "") or ""
+    return f"{first_name} {last_name}".strip()
+
+
 def format_channel_display(ch: dict) -> str:
     title = ch.get("channel_title") or ch.get("channel_username", "")
     username = ch.get("channel_username", "")

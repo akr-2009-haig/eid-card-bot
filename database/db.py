@@ -156,7 +156,18 @@ def add_user(user_id: int, username: str, full_name: str):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT OR IGNORE INTO users (user_id, username, full_name) VALUES (?, ?, ?)",
+        """
+        INSERT INTO users (user_id, username, full_name) VALUES (?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            username = CASE
+                WHEN excluded.username != '' THEN excluded.username
+                ELSE users.username
+            END,
+            full_name = CASE
+                WHEN excluded.full_name != '' THEN excluded.full_name
+                ELSE users.full_name
+            END
+        """,
         (user_id, username, full_name)
     )
     conn.commit()
