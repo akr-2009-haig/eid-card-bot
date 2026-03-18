@@ -35,7 +35,7 @@ API_HASH = os.getenv("API_HASH", "").strip()
 DATABASE_PATH = os.getenv("DATABASE_PATH", os.path.join(STORAGE_DIR, "database", "bot.db"))
 
 TEMPLATES_DIR = os.getenv("TEMPLATES_DIR", os.path.join(STORAGE_DIR, "data", "templates"))
-# Fonts are bundled with the application by default; mutable runtime data uses STORAGE_DIR.
+# Font files live in the application directory by default; mutable runtime data uses STORAGE_DIR.
 FONTS_DIR = os.getenv("FONTS_DIR", os.path.join(BASE_DIR, "data", "fonts"))
 GENERATED_DIR = os.getenv("GENERATED_DIR", os.path.join(STORAGE_DIR, "data", "generated"))
 

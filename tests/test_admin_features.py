@@ -88,7 +88,7 @@ class TelegramLinkParsingTests(unittest.TestCase):
 
 
 class RuntimeConfigTests(unittest.TestCase):
-    def test_config_reads_render_environment_variables(self):
+    def test_config_reads_all_environment_variables_and_applies_type_conversions(self):
         original_values = {
             key: os.environ.get(key)
             for key in (
@@ -159,14 +159,16 @@ class RuntimeConfigTests(unittest.TestCase):
         missing = validate_runtime_config("123456:ABC", 12345, "hash")
         self.assertEqual(missing, [])
 
-    def test_config_admin_ids_falls_back_when_environment_value_is_invalid(self):
+    def test_config_admin_ids_falls_back_when_environment_value_has_no_valid_ids(self):
         original_admin_ids = os.environ.get("ADMIN_IDS")
-        os.environ["ADMIN_IDS"] = " , invalid , "
 
         try:
-            import config
-            reloaded_config = importlib.reload(config)
-            self.assertEqual(reloaded_config.ADMIN_IDS, [123456789])
+            for value in (" , invalid , ", "   "):
+                with self.subTest(admin_ids=value):
+                    os.environ["ADMIN_IDS"] = value
+                    import config
+                    reloaded_config = importlib.reload(config)
+                    self.assertEqual(reloaded_config.ADMIN_IDS, [123456789])
         finally:
             if original_admin_ids is None:
                 os.environ.pop("ADMIN_IDS", None)
