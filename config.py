@@ -1,5 +1,7 @@
 import os
 
+DEFAULT_ADMIN_IDS = [123456789]
+
 
 def _get_int_env(name: str, default: int = 0) -> int:
     value = os.getenv(name, "").strip()
@@ -21,14 +23,14 @@ def _parse_admin_ids(value: str) -> list[int]:
             ids.append(int(item))
         except ValueError:
             continue
-    return ids or [123456789]
+    return ids or DEFAULT_ADMIN_IDS.copy()
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STORAGE_DIR = os.getenv("STORAGE_DIR", BASE_DIR)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE").strip()
-ADMIN_IDS = _parse_admin_ids(os.getenv("ADMIN_IDS", "123456789"))
+ADMIN_IDS = _parse_admin_ids(os.getenv("ADMIN_IDS", ",".join(str(admin_id) for admin_id in DEFAULT_ADMIN_IDS)))
 API_ID = _get_int_env("API_ID", 0)
 API_HASH = os.getenv("API_HASH", "").strip()
 

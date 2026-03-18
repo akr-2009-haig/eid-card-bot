@@ -168,7 +168,7 @@ class RuntimeConfigTests(unittest.TestCase):
                     os.environ["ADMIN_IDS"] = value
                     import config
                     reloaded_config = importlib.reload(config)
-                    self.assertEqual(reloaded_config.ADMIN_IDS, [123456789])
+                    self.assertEqual(reloaded_config.ADMIN_IDS, reloaded_config.DEFAULT_ADMIN_IDS)
         finally:
             if original_admin_ids is None:
                 os.environ.pop("ADMIN_IDS", None)
