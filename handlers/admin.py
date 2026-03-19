@@ -28,6 +28,7 @@ from utils.helpers import is_admin
 
 
 def _display_path(path: str) -> str:
+    """Return a project-relative path when possible, otherwise the original path."""
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     try:
         rel_path = os.path.relpath(path, base_dir)
@@ -37,6 +38,7 @@ def _display_path(path: str) -> str:
 
 
 def _format_color(color: tuple[int, int, int]) -> str:
+    """Format an RGB tuple for display inside admin messages."""
     return f"RGB{color}"
 
 

@@ -314,7 +314,7 @@ class AdminHandlerFlowTests(unittest.IsolatedAsyncioTestCase):
         app = FakeApp()
         admin_handlers.register_admin_handler(app)
 
-        admin_settings_menu = next(
+        admin_settings_handler = next(
             handler for handler in app.callback_handlers if handler.__name__ == "admin_settings_menu"
         )
 
@@ -327,7 +327,7 @@ class AdminHandlerFlowTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(admin_handlers, "is_admin", return_value=True), patch.object(
             admin_handlers.os.path, "exists", return_value=True
         ):
-            await admin_settings_menu(None, callback)
+            await admin_settings_handler(None, callback)
 
         self.assertIn("⚙️ إعدادات البوت", callback.message.edited_text)
         self.assertIn("مدة التهدئة بين الطلبات", callback.message.edited_text)
