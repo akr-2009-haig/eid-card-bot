@@ -310,6 +310,35 @@ class AdminHandlerFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(db.get_text("start_message"), "رسالة بداية جديدة")
         self.assertEqual(message.reply_calls[-1]["text"], "✅ تم تحديث النص بنجاح")
 
+    async def test_admin_settings_menu_shows_runtime_configuration_summary(self):
+        app = FakeApp()
+        admin_handlers.register_admin_handler(app)
+
+        admin_settings_menu = next(
+            handler for handler in app.callback_handlers if handler.__name__ == "admin_settings_menu"
+        )
+
+        db.add_user(2001, "eid_user", "محمد أحمد")
+        db.add_channel("@eidchannel", "قناة العيد", "channel")
+        db.add_template("file-id", os.path.join(self.temp_dir.name, "template.jpg"))
+
+        callback = FakeCallback(user_id=1, data="admin_settings")
+
+        with patch.object(admin_handlers, "is_admin", return_value=True), patch.object(
+            admin_handlers.os.path, "exists", return_value=True
+        ):
+            await admin_settings_menu(None, callback)
+
+        self.assertIn("⚙️ إعدادات البوت", callback.message.edited_text)
+        self.assertIn("مدة التهدئة بين الطلبات", callback.message.edited_text)
+        self.assertIn("لون النص: RGB", callback.message.edited_text)
+        self.assertIn("مجلد القوالب:", callback.message.edited_text)
+        self.assertIn("ملف الخط:", callback.message.edited_text)
+        self.assertIn("✅ موجود", callback.message.edited_text)
+        self.assertIn("القوالب المضافة: 1", callback.message.edited_text)
+        self.assertIn("قنوات الاشتراك الإجباري: 1", callback.message.edited_text)
+        self.assertIn("المستخدمون المسجلون: 1", callback.message.edited_text)
+
     async def test_admin_add_button_flow_saves_button_and_confirms(self):
         app = FakeApp()
         texts_buttons.register_texts_buttons_handlers(app)
