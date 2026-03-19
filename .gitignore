@@ -49,3 +49,14 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Python environment / secrets
+.env
+*.session
+*.session-journal
+
+# Generated bot output (runtime artefacts)
+data/generated/*
+!data/generated/.gitkeep
+logs/*.log
+!logs/.gitkeep

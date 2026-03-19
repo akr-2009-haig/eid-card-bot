@@ -721,11 +721,12 @@ eid_card_bot/
 ├── main.py
 ├── config.py
 ├── requirements.txt
+├── .env.example
+├── setup_font.py
 │
 ├── database/
-│   ├── database.db
 │   ├── db.py
-│   ├── models.py
+│   └── bot.db
 │
 ├── handlers/
 │   ├── start.py
@@ -733,28 +734,30 @@ eid_card_bot/
 │   ├── admin.py
 │   ├── templates.py
 │   ├── forcesub.py
+│   ├── forcesub_admin.py
 │   ├── ads.py
-│   ├── texts_buttons.py
+│   └── texts_buttons.py
 │
 ├── keyboards/
 │   ├── user_keyboard.py
-│   ├── admin_keyboard.py
+│   └── admin_keyboard.py
 │
 ├── services/
 │   ├── image_generator.py
 │   ├── template_manager.py
 │   ├── subscription_checker.py
-│   ├── broadcast.py
+│   └── broadcast.py
 │
 ├── data/
 │   ├── templates/
 │   ├── fonts/
 │   │   └── arabic.ttf
-│   ├── generated/
+│   └── generated/
 │
 ├── utils/
 │   ├── helpers.py
 │   ├── rate_limit.py
+│   └── telegram_links.py
 │
 └── logs/
     └── bot.log
