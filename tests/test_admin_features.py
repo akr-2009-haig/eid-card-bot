@@ -3,8 +3,11 @@ import os
 import tempfile
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from database import db
+from handlers import admin as admin_handlers
+from handlers import texts_buttons
 from main import validate_runtime_config
 from utils.helpers import get_full_name
 from utils.telegram_links import normalize_channel_input, resolve_channel_link, resolve_channel_target
@@ -176,6 +179,126 @@ class RuntimeConfigTests(unittest.TestCase):
                 os.environ["ADMIN_IDS"] = original_admin_ids
             import config
             importlib.reload(config)
+
+
+class FakeApp:
+    def __init__(self):
+        self.message_handlers = []
+        self.callback_handlers = []
+
+    def on_message(self, *args, **kwargs):
+        def decorator(func):
+            self.message_handlers.append(func)
+            return func
+
+        return decorator
+
+    def on_callback_query(self, *args, **kwargs):
+        def decorator(func):
+            self.callback_handlers.append(func)
+            return func
+
+        return decorator
+
+
+class FakeCallbackMessage:
+    def __init__(self):
+        self.edited_text = None
+        self.reply_markup = None
+
+    async def edit_text(self, text, reply_markup=None):
+        self.edited_text = text
+        self.reply_markup = reply_markup
+
+
+class FakeCallback:
+    def __init__(self, user_id: int, data: str):
+        self.from_user = SimpleNamespace(id=user_id)
+        self.data = data
+        self.message = FakeCallbackMessage()
+        self.answer_calls = []
+
+    async def answer(self, text=None, show_alert=False):
+        self.answer_calls.append((text, show_alert))
+
+
+class FakeReplyMessage:
+    def __init__(self, user_id: int, text: str):
+        self.from_user = SimpleNamespace(id=user_id)
+        self.text = text
+        self.reply_calls = []
+
+    async def reply(self, text, reply_markup=None, quote=False):
+        self.reply_calls.append(
+            {"text": text, "reply_markup": reply_markup, "quote": quote}
+        )
+
+
+class AdminHandlerFlowTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.original_db_path = db.DATABASE_PATH
+        db.DATABASE_PATH = os.path.join(self.temp_dir.name, "test.db")
+        db.init_db()
+        texts_buttons._admin_text_state.clear()
+        texts_buttons._waiting_button_input.clear()
+        texts_buttons._button_input_data.clear()
+
+    async def asyncTearDown(self):
+        texts_buttons._admin_text_state.clear()
+        texts_buttons._waiting_button_input.clear()
+        texts_buttons._button_input_data.clear()
+        db.DATABASE_PATH = self.original_db_path
+        self.temp_dir.cleanup()
+
+    async def test_admin_edit_text_callback_updates_text_via_texts_buttons_state(self):
+        app = FakeApp()
+        admin_handlers.register_admin_handler(app)
+        texts_buttons.register_texts_buttons_handlers(app)
+
+        admin_edit_text_cb = next(
+            handler for handler in app.callback_handlers if handler.__name__ == "admin_edit_text_cb"
+        )
+        handle_admin_text_input = next(
+            handler for handler in app.message_handlers if handler.__name__ == "handle_admin_text_input"
+        )
+
+        callback = FakeCallback(user_id=1, data="admin_edit_start")
+        message = FakeReplyMessage(user_id=1, text="رسالة بداية جديدة")
+
+        with patch.object(admin_handlers, "is_admin", return_value=True), patch.object(
+            texts_buttons, "is_admin", return_value=True
+        ):
+            await admin_edit_text_cb(None, callback)
+            await handle_admin_text_input(None, message)
+
+        self.assertIn("✏️ أرسل رسالة البداية الجديدة", callback.message.edited_text)
+        self.assertEqual(db.get_text("start_message"), "رسالة بداية جديدة")
+        self.assertEqual(message.reply_calls[-1]["text"], "✅ تم تحديث النص بنجاح")
+
+    async def test_admin_add_button_flow_saves_button_and_confirms(self):
+        app = FakeApp()
+        texts_buttons.register_texts_buttons_handlers(app)
+
+        admin_add_button_cb = next(
+            handler for handler in app.callback_handlers if handler.__name__ == "admin_add_button_cb"
+        )
+        handle_admin_text_input = next(
+            handler for handler in app.message_handlers if handler.__name__ == "handle_admin_text_input"
+        )
+
+        callback = FakeCallback(user_id=1, data="admin_add_button")
+        message = FakeReplyMessage(user_id=1, text="قناة البوت\nhttps://t.me/mychannel")
+
+        with patch.object(texts_buttons, "is_admin", return_value=True):
+            await admin_add_button_cb(None, callback)
+            await handle_admin_text_input(None, message)
+
+        buttons = db.get_buttons()
+        self.assertEqual(len(buttons), 1)
+        self.assertEqual(buttons[0]["label"], "قناة البوت")
+        self.assertEqual(buttons[0]["url"], "https://t.me/mychannel")
+        self.assertIn("✅ تم إضافة الزر بنجاح", message.reply_calls[-1]["text"])
 
 
 if __name__ == "__main__":

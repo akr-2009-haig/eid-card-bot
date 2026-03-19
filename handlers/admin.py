@@ -5,15 +5,13 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database.db import (
-    get_users_count, get_templates_count, get_channels,
-    get_text, set_text, get_buttons
-)
+from database.db import get_users_count, get_templates_count, get_channels, get_text
 from keyboards.admin_keyboard import (
     admin_main_keyboard, admin_templates_keyboard, admin_forcesub_keyboard,
     admin_texts_keyboard, admin_buttons_keyboard, admin_ads_keyboard,
     admin_back_keyboard
 )
+from handlers.texts_buttons import set_admin_text_state
 from utils.helpers import is_admin
 
 
@@ -141,8 +139,7 @@ def register_admin_handler(app: Client):
             await callback.answer("خطأ", show_alert=True)
             return
 
-        from handlers.admin_text_handler import set_state
-        set_state(callback.from_user.id, text_key)
+        set_admin_text_state(callback.from_user.id, text_key)
 
         current = get_text(text_key)
         prompt_map = {
