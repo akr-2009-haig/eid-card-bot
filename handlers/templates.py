@@ -5,14 +5,38 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database.db import get_templates, delete_template
-from keyboards.admin_keyboard import (
-    admin_templates_keyboard, template_delete_keyboard, admin_back_keyboard
-)
+from database.db import get_templates, get_template
+from keyboards.admin_keyboard import admin_templates_keyboard, template_delete_keyboard
 from services.template_manager import save_template_file, register_template, remove_template
 from utils.helpers import is_admin, logger
 
 _waiting_template_upload: set = set()
+
+
+def _template_storage_path(file_path: str) -> str:
+    return f"data/templates/{os.path.basename(file_path)}"
+
+
+def _template_display_name(template: dict) -> str:
+    return (
+        template.get("original_filename")
+        or os.path.basename(template.get("file_path") or "")
+        or f"template_{template.get('id', '')}"
+    )
+
+
+def _template_placeholder_summary(metadata: dict | None) -> str:
+    if not metadata:
+        return "ℹ️ OCR: لم يتم العثور على كلمة الاسم تلقائيًا، وسيستخدم البوت الموضع الافتراضي الحالي."
+
+    placeholder_text = metadata.get("placeholder_text") or "الاسم"
+    return (
+        "🔎 OCR: تم اكتشاف موضع الاسم تلقائيًا\n"
+        f"• النص المكتشف: {placeholder_text}\n"
+        f"• X={metadata['placeholder_x']} | Y={metadata['placeholder_y']}\n"
+        f"• W={metadata['placeholder_w']} | H={metadata['placeholder_h']}\n"
+        f"• حجم الخط المقترح: {metadata['font_size']}"
+    )
 
 
 def register_template_handlers(app: Client):
@@ -25,7 +49,8 @@ def register_template_handlers(app: Client):
         _waiting_template_upload.add(callback.from_user.id)
         await callback.message.edit_text(
             "📤 أرسل الصورة التي تريد إضافتها كقالب.\n"
-            "يمكنك إرسال PNG أو JPG أو JPEG، وسيتم حفظها داخل مجلد القوالب واستخدامها تلقائيًا عند التصميم."
+            "يمكنك إرسال أي صورة بأي مقاس بصيغة PNG أو JPG أو JPEG.\n"
+            "سيتم حفظها داخل data/templates/ ثم تشغيل OCR للبحث عن كلمة الاسم أو [الاسم] أو (الاسم) لاستخدامها تلقائيًا عند التصميم."
         )
         await callback.answer()
 
@@ -53,17 +78,12 @@ def register_template_handlers(app: Client):
             dest_path = save_template_file(local_path, original_filename=original_filename)
             os.remove(local_path)
             tpl_id, metadata = register_template(file_id, dest_path, original_filename=original_filename)
-            placeholder_note = (
-                f"\n🔎 تم اكتشاف موضع الاسم تلقائيًا عند الإحداثيات: "
-                f"X={metadata['placeholder_x']} Y={metadata['placeholder_y']}"
-                if metadata
-                else "\nℹ️ لم يتم اكتشاف كلمة الاسم تلقائيًا، وسيستخدم البوت الموضع الافتراضي الحالي."
-            )
             await message.reply(
                 "✅ تم إضافة القالب بنجاح\n"
-                "🖼 أصبح القالب متاح الآن لاستخدامه في تصميم البطاقات."
+                "🖼 أصبح القالب متاح الآن لاستخدامه في تصميم البطاقات.\n"
                 f"\n📁 رقم القالب: {tpl_id}"
-                f"{placeholder_note}",
+                f"\n🗂 تم حفظ الملف داخل: {_template_storage_path(dest_path)}\n"
+                f"{_template_placeholder_summary(metadata)}",
                 reply_markup=admin_templates_keyboard(),
                 quote=True
             )
@@ -86,13 +106,17 @@ def register_template_handlers(app: Client):
             return
 
         await callback.message.edit_text(
-            f"📂 القوالب الحالية في البوت\nعدد القوالب: {len(templates)}",
+            "📂 القوالب الحالية في البوت\n"
+            f"عدد القوالب: {len(templates)}\n"
+            "🎲 سيتم اختيار قالب عشوائي منها عند تصميم البطاقة للمستخدم.",
             reply_markup=admin_templates_keyboard()
         )
         for template in templates:
             caption = (
                 f"🖼 قالب {template['id']}\n"
-                f"📄 الملف: {template.get('original_filename') or os.path.basename(template.get('file_path') or '')}\n"
+                f"📄 الملف: {_template_display_name(template)}\n"
+                f"🗂 المسار: {_template_storage_path(template.get('file_path', ''))}\n"
+                f"{_template_placeholder_summary(template)}\n"
                 f"🕒 أضيف في: {template['added_at']}"
             )
             file_path = template.get("file_path", "")
@@ -118,7 +142,8 @@ def register_template_handlers(app: Client):
             await callback.answer()
             return
         await callback.message.edit_text(
-            "🗑 اختر القالب الذي تريد حذفه:",
+            "🗑 اختر القالب الذي تريد حذفه\n"
+            "سيتم حذف الصورة من data/templates/ وتحديث قاعدة البيانات مباشرة.",
             reply_markup=template_delete_keyboard(templates)
         )
         await callback.answer()
@@ -129,9 +154,19 @@ def register_template_handlers(app: Client):
             await callback.answer("⛔ ممنوع", show_alert=True)
             return
         template_id = int(callback.data.split("_")[-1])
+        deleted_template = get_template(template_id)
+        if not deleted_template:
+            await callback.message.edit_text(
+                "⚠️ القالب المطلوب غير موجود أو تم حذفه مسبقًا.",
+                reply_markup=admin_templates_keyboard()
+            )
+            await callback.answer()
+            return
         remove_template(template_id)
         await callback.message.edit_text(
-            "✅ تم حذف القالب بنجاح",
+            "✅ تم حذف القالب بنجاح\n"
+            f"📄 القالب المحذوف: {_template_display_name(deleted_template)}\n"
+            "🧾 تم تحديث قاعدة البيانات وإزالة الملف من النظام.",
             reply_markup=admin_templates_keyboard()
         )
         await callback.answer()

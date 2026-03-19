@@ -58,7 +58,11 @@ def register_admin_handler(app: Client):
             return
         await callback.message.edit_text(
             "🎨 إدارة قوالب بطاقات العيد\n"
-            "يمكنك من هنا إدارة القوالب التي يستخدمها البوت لتصميم بطاقات التهنئة.",
+            "يمكنك من هنا إدارة القوالب التي يستخدمها البوت لتصميم بطاقات التهنئة.\n\n"
+            "• يدعم جميع مقاسات الصور\n"
+            "• يمكن إضافة عدد غير محدود من القوالب\n"
+            "• يتم اختيار قالب عشوائي عند تصميم البطاقة\n"
+            "• يتم حفظ القوالب داخل data/templates/",
             reply_markup=admin_templates_keyboard()
         )
         await callback.answer()

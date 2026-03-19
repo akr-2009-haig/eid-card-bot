@@ -331,7 +331,7 @@ def update_template_metadata(template_id: int, metadata: dict):
 def delete_template(template_id: int):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT file_path FROM templates WHERE id = ?", (template_id,))
+    cursor.execute("SELECT * FROM templates WHERE id = ?", (template_id,))
     row = cursor.fetchone()
     cursor.execute("DELETE FROM templates WHERE id = ?", (template_id,))
     conn.commit()
