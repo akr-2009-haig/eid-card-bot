@@ -27,7 +27,7 @@ python main.py
 ## وثيقة الاستضافة
 
 - راجع الملف `HOSTING.md` لمعرفة الاستضافات المجانية والرخيصة المناسبة للبوت.
-- يوجد ملف `render.yaml` جاهز للنشر على Render كخدمة `worker` مع `STORAGE_DIR=/var/data` لاستخدام قرص دائم.
+- يوجد ملف `render.yaml` جاهز للنشر على Render كخدمة `worker` مع `STORAGE_DIR=/var/data` لاستخدام قرص دائم، وتم تثبيت إصدار Python في Render على `3.11.8` عبر `.python-version` و `PYTHON_VERSION`.
 
 فكرة البوت
 
