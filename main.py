@@ -23,7 +23,6 @@ from handlers.templates import register_template_handlers
 from handlers.texts_buttons import register_texts_buttons_handlers
 from handlers.forcesub_admin import register_forcesub_admin_handlers
 from handlers.ads import register_ads_handlers
-from handlers.admin_text_handler import register_admin_text_message_handler
 
 
 def validate_runtime_config(
@@ -73,7 +72,6 @@ def main():
 
     app = create_app()
 
-    register_admin_text_message_handler(app)
     register_forcesub_admin_handlers(app)
     register_texts_buttons_handlers(app)
     register_ads_handlers(app)
