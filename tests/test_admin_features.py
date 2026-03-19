@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from database import db
 from handlers import admin as admin_handlers
+from handlers import templates as template_handlers
 from handlers import texts_buttons
 from main import validate_runtime_config
 from utils.helpers import get_full_name
@@ -205,6 +206,7 @@ class FakeCallbackMessage:
     def __init__(self):
         self.edited_text = None
         self.reply_markup = None
+        self.chat = SimpleNamespace(id=999)
 
     async def edit_text(self, text, reply_markup=None):
         self.edited_text = text
@@ -234,6 +236,36 @@ class FakeReplyMessage:
         )
 
 
+class FakeTemplateMessage:
+    def __init__(self, user_id: int, message_id: int = 50, photo=None, document=None):
+        self.from_user = SimpleNamespace(id=user_id)
+        self.id = message_id
+        self.photo = photo
+        self.document = document
+        self.reply_calls = []
+
+    async def reply(self, text, reply_markup=None, quote=False):
+        self.reply_calls.append(
+            {"text": text, "reply_markup": reply_markup, "quote": quote}
+        )
+
+
+class FakeTemplateClient:
+    def __init__(self, download_path: str = ""):
+        self.download_path = download_path
+        self.sent_photos = []
+        self.sent_documents = []
+
+    async def download_media(self, media, file_name=None):
+        return self.download_path
+
+    async def send_photo(self, chat_id, photo, caption=None):
+        self.sent_photos.append({"chat_id": chat_id, "photo": photo, "caption": caption})
+
+    async def send_document(self, chat_id, document, caption=None):
+        self.sent_documents.append({"chat_id": chat_id, "document": document, "caption": caption})
+
+
 class AdminHandlerFlowTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -243,11 +275,13 @@ class AdminHandlerFlowTests(unittest.IsolatedAsyncioTestCase):
         texts_buttons._admin_text_state.clear()
         texts_buttons._waiting_button_input.clear()
         texts_buttons._button_input_data.clear()
+        template_handlers._waiting_template_upload.clear()
 
     async def asyncTearDown(self):
         texts_buttons._admin_text_state.clear()
         texts_buttons._waiting_button_input.clear()
         texts_buttons._button_input_data.clear()
+        template_handlers._waiting_template_upload.clear()
         db.DATABASE_PATH = self.original_db_path
         self.temp_dir.cleanup()
 
@@ -299,6 +333,113 @@ class AdminHandlerFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(buttons[0]["label"], "قناة البوت")
         self.assertEqual(buttons[0]["url"], "https://t.me/mychannel")
         self.assertIn("✅ تم إضافة الزر بنجاح", message.reply_calls[-1]["text"])
+
+    async def test_admin_add_template_flow_reports_storage_and_ocr_details(self):
+        app = FakeApp()
+        template_handlers.register_template_handlers(app)
+
+        admin_add_template_cb = next(
+            handler for handler in app.callback_handlers if handler.__name__ == "admin_add_template"
+        )
+        receive_template_photo = next(
+            handler for handler in app.message_handlers if handler.__name__ == "receive_template_photo"
+        )
+
+        callback = FakeCallback(user_id=1, data="admin_add_template")
+        message = FakeTemplateMessage(
+            user_id=1,
+            photo=SimpleNamespace(file_id="photo-file-id"),
+        )
+        client = FakeTemplateClient(download_path=os.path.join(self.temp_dir.name, "template_upload.jpg"))
+        saved_path = os.path.join(self.temp_dir.name, "template_saved.png")
+        with open(client.download_path, "wb") as downloaded_file:
+            downloaded_file.write(b"downloaded")
+
+        with patch.object(template_handlers, "is_admin", return_value=True), patch.object(
+            template_handlers, "save_template_file", return_value=saved_path
+        ), patch.object(
+            template_handlers,
+            "register_template",
+            return_value=(
+                7,
+                {
+                    "placeholder_x": 520,
+                    "placeholder_y": 760,
+                    "placeholder_w": 120,
+                    "placeholder_h": 40,
+                    "font_size": 60,
+                    "placeholder_text": "[الاسم]",
+                },
+            ),
+        ), patch.object(template_handlers.os, "remove") as remove_mock:
+            await admin_add_template_cb(None, callback)
+            await receive_template_photo(client, message)
+
+        self.assertIn("PNG أو JPG أو JPEG", callback.message.edited_text)
+        self.assertIn("data/templates/template_saved.png", message.reply_calls[-1]["text"])
+        self.assertIn("🔎 OCR: تم اكتشاف موضع الاسم تلقائيًا", message.reply_calls[-1]["text"])
+        self.assertIn("X=520 | Y=760", message.reply_calls[-1]["text"])
+        remove_mock.assert_called_once_with(client.download_path)
+
+    async def test_admin_view_templates_lists_random_selection_and_metadata(self):
+        app = FakeApp()
+        template_handlers.register_template_handlers(app)
+        admin_view_templates = next(
+            handler for handler in app.callback_handlers if handler.__name__ == "admin_view_templates"
+        )
+
+        template_path = os.path.join(self.temp_dir.name, "template1.jpg")
+        with open(template_path, "wb") as template_file:
+            template_file.write(b"template")
+        db.add_template(
+            "file-id",
+            template_path,
+            original_filename="eid_template_gold.jpg",
+            placeholder_x=540,
+            placeholder_y=820,
+            placeholder_w=110,
+            placeholder_h=44,
+            font_size=60,
+            placeholder_text="[الاسم]",
+        )
+
+        callback = FakeCallback(user_id=1, data="admin_view_templates")
+        client = FakeTemplateClient()
+
+        with patch.object(template_handlers, "is_admin", return_value=True):
+            await admin_view_templates(client, callback)
+
+        self.assertIn("عدد القوالب: 1", callback.message.edited_text)
+        self.assertIn("اختيار قالب عشوائي", callback.message.edited_text)
+        self.assertEqual(len(client.sent_photos), 1)
+        self.assertIn("eid_template_gold.jpg", client.sent_photos[0]["caption"])
+        self.assertIn("🔎 OCR: تم اكتشاف موضع الاسم تلقائيًا", client.sent_photos[0]["caption"])
+        self.assertIn("data/templates/template1.jpg", client.sent_photos[0]["caption"])
+
+    async def test_admin_delete_template_flow_removes_file_and_confirms_database_update(self):
+        app = FakeApp()
+        template_handlers.register_template_handlers(app)
+        admin_confirm_delete_template = next(
+            handler for handler in app.callback_handlers if handler.__name__ == "admin_confirm_delete_template"
+        )
+
+        template_path = os.path.join(self.temp_dir.name, "delete_me.png")
+        with open(template_path, "wb") as template_file:
+            template_file.write(b"template")
+        template_id = db.add_template(
+            "file-id",
+            template_path,
+            original_filename="eid_template_gold.png",
+        )
+        callback = FakeCallback(user_id=1, data=f"admin_del_tpl_{template_id}")
+
+        with patch.object(template_handlers, "is_admin", return_value=True):
+            await admin_confirm_delete_template(None, callback)
+
+        self.assertIsNone(db.get_template(template_id))
+        self.assertFalse(os.path.exists(template_path))
+        self.assertIn("eid_template_gold.png", callback.message.edited_text)
+        self.assertIn("تم تحديث قاعدة البيانات", callback.message.edited_text)
 
 
 if __name__ == "__main__":
