@@ -5,6 +5,18 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import (
+    ADMIN_IDS,
+    DATABASE_PATH,
+    FONT_PATH,
+    FONT_SIZE_LABEL,
+    FONT_SIZE_NAME,
+    GENERATED_DIR,
+    RATE_LIMIT_SECONDS,
+    TEMPLATES_DIR,
+    TEXT_COLOR,
+    TEXT_SHADOW_COLOR,
+)
 from database.db import get_users_count, get_templates_count, get_channels, get_text
 from keyboards.admin_keyboard import (
     admin_main_keyboard, admin_templates_keyboard, admin_forcesub_keyboard,
@@ -13,6 +25,21 @@ from keyboards.admin_keyboard import (
 )
 from handlers.texts_buttons import set_admin_text_state
 from utils.helpers import is_admin
+
+
+def _display_path(path: str) -> str:
+    """Return a project-relative path when possible, otherwise the original path."""
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        rel_path = os.path.relpath(path, base_dir)
+    except ValueError:
+        return path
+    return rel_path if not rel_path.startswith("..") else path
+
+
+def _format_color(color: tuple[int, int, int]) -> str:
+    """Format an RGB tuple for display inside admin messages."""
+    return f"RGB{color}"
 
 
 def register_admin_handler(app: Client):
@@ -118,8 +145,23 @@ def register_admin_handler(app: Client):
         if not is_admin(callback.from_user.id):
             await callback.answer("⛔ ممنوع", show_alert=True)
             return
+        font_status = "✅ موجود" if os.path.exists(FONT_PATH) else "⚠️ غير موجود"
         await callback.message.edit_text(
-            "⚙️ إعدادات البوت\n\nلا توجد إعدادات إضافية حالياً.",
+            "⚙️ إعدادات البوت\n\n"
+            f"👮 عدد الأدمنية: {len(ADMIN_IDS)}\n"
+            f"⏱️ مدة التهدئة بين الطلبات: {RATE_LIMIT_SECONDS} ثوانٍ\n"
+            f"🔤 خط الاسم: {FONT_SIZE_NAME}\n"
+            f"🏷️ خط عبارة التهنئة: {FONT_SIZE_LABEL}\n"
+            f"🎨 لون النص: {_format_color(TEXT_COLOR)}\n"
+            f"🌑 لون الظل: {_format_color(TEXT_SHADOW_COLOR)}\n"
+            f"🖼️ مجلد القوالب: {_display_path(TEMPLATES_DIR)}\n"
+            f"🪄 مجلد البطاقات الناتجة: {_display_path(GENERATED_DIR)}\n"
+            f"🗄️ قاعدة البيانات: {_display_path(DATABASE_PATH)}\n"
+            f"🔠 ملف الخط: {_display_path(FONT_PATH)} ({font_status})\n\n"
+            f"📊 الحالة الحالية:\n"
+            f"• القوالب المضافة: {get_templates_count()}\n"
+            f"• قنوات الاشتراك الإجباري: {len(get_channels())}\n"
+            f"• المستخدمون المسجلون: {get_users_count()}",
             reply_markup=admin_back_keyboard()
         )
         await callback.answer()
