@@ -1,1 +1,5 @@
 2026-03-18 18:42:42,899 [INFO] pyrogram.crypto.aes: Using TgCrypto
+2026-03-19 17:21:33,132 [ERROR] eid_bot: Card generation error for user 209: test error
+2026-03-19 17:21:47,883 [ERROR] eid_bot: Card generation error for user 209: test error
+2026-03-19 17:22:00,995 [ERROR] eid_bot: Card generation error for user 209: test error
+2026-03-19 17:22:36,430 [ERROR] eid_bot: Card generation error for user 209: test error
